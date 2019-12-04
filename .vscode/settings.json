@@ -41,7 +41,8 @@
         "sstream": "cpp",
         "stdexcept": "cpp",
         "streambuf": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "2048.h": "c"
     },
     "python.pythonPath": "C:\\Users\\hp\\AppData\\Local\\Programs\\Python\\Python37-32\\python.exe",
     "cquery.cacheDirectory": "${workspaceFolder}/.vscode/cquery_cached_index/"

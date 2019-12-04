@@ -2,21 +2,133 @@
 
 int main()
 {
-    Init(MAXX, MAXY, BLOCK_SIZE);
-    generate();
-    generate();
-    //set_block_value(0, 0, 1024);
-    //MessageBox(NULL, "你赢了！", "2048", 0);
+    Init();
     while (1)
-        ;
+        Step();
     return 0;
 }
 
-// 初始化，x行，y列，格子大小为bs
-void Init(int x, int y, int bs)
+// 初始化
+void Init()
 {
-    initUI(x, y, bs);
-    init_map(x, y);
+    initUI();
+    init_map();
+    new_game();
+}
+
+// 处理每一步的操作
+void Step()
+{
+    prepare_to_input();
+    char ch = getch();
+    if (ch == -32)
+        ch = getch();
+    //printf("%d", ch);///
+    //TODO:移动、合并
+    judge();
+    if (has_space())
+        generate();
+}
+
+//把光标移到输入区
+void prepare_to_input()
+{
+    COORD coord = {0, (BLOCK_SIZE + 1) * MAXX + 4};
+    locate(coord);
+}
+
+//判断游戏胜负情况
+void judge()
+{
+    if (has_space())
+        return;
+    else if (judge_win())
+        win();
+    else if (judge_lose())
+        lose();
+}
+
+//判断是否胜利，胜利返回1
+int judge_win()
+{
+    for (int i = 0; i < MAXX; ++i)
+        for (int j = 0; j < MAXY; ++j)
+            if (map[i][j]->value == GOAL)
+                return 1;
+    return 0;
+}
+
+//判断是否失败，失败返回1
+int judge_lose()
+{
+    for (int i = 0; i < MAXX; ++i)
+        for (int j = 0; j < MAXY; ++j)
+            if ((i < MAXX - 1 && map[i + 1][j]->value == map[i][j]->value) ||
+                (j < MAXY - 1 && map[i][j + 1]->value == map[i][j]->value))
+                return 0;
+    return 1;
+}
+
+//游戏失败处理
+void lose()
+{
+    puts("已无可移动的方块，游戏失败。\n N - 新游戏  C - 继续游戏");
+    char c = getch();
+    while (1)
+    {
+        switch (c)
+        {
+        case 'N':
+        case 'n':
+            new_game();
+        case 'C':
+        case 'c':
+            empty_input_area();
+            return;
+        }
+        c = getch();
+    }
+}
+
+//游戏胜利处理
+void win()
+{
+    puts("游戏胜利，恭喜！\n N - 新游戏  C - 继续游戏");
+    char c = getch();
+    while (1)
+    {
+        switch (c)
+        {
+        case 'N':
+        case 'n':
+            new_game();
+        case 'C':
+        case 'c':
+            empty_input_area();
+            return;
+        }
+        c = getch();
+    }
+}
+
+//清空输入区
+void empty_input_area()
+{
+    prepare_to_input();
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < max(40, 3 + MAXY * (BLOCK_SIZE * 2 + 1)); ++j)
+            putchar(' ');
+    prepare_to_input();
+}
+
+// 新游戏，清空棋盘，随机生成两个方块
+void new_game()
+{
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j)
+            set_block_value(i, j, 0);
+    generate();
+    generate();
 }
 
 // 返回一个十进制整数的位数
@@ -38,10 +150,13 @@ void locate(COORD coord)
 }
 
 // 传入方块指针，返回实际的光标位置
-COORD get_coord(block *b)
+COORD get_coord(const block *b)
 {
     COORD coord;
-    coord.X = 1 + (BLOCK_SIZE * 2 + 1) * b->y + (BLOCK_SIZE * 2 - cnt_digits(b->value) + 1) / 2;
+    if (b->value)
+        coord.X = 1 + (BLOCK_SIZE * 2 + 1) * b->y + (BLOCK_SIZE * 2 - cnt_digits(b->value) + 1) / 2;
+    else
+        coord.X = 1 + (BLOCK_SIZE * 2 + 1) * b->y;
     coord.Y = 3 + (BLOCK_SIZE + 1) * b->x + (BLOCK_SIZE + 1) / 2;
     return coord;
 }
@@ -93,10 +208,10 @@ void generate()
 }
 
 //初始化游戏地图数组
-void init_map(int x, int y)
+void init_map()
 {
-    for (int i = 0; i < x; ++i)
-        for (int j = 0; j < y; ++j)
+    for (int i = 0; i < MAXX; ++i)
+        for (int j = 0; j < MAXY; ++j)
             map[i][j] = new_block(i, j);
 }
 
@@ -112,92 +227,97 @@ void print_block(int i, int j)
 {
     block *b = map[i][j];
     COORD coord = get_coord(b);
+    locate(coord);
     if (b->value == 0)
-    {
-        coord.X -= 3;
-        locate(coord);
         for (int i = 0; i < BLOCK_SIZE * 2; ++i)
             putchar(' ');
-    }
     else
-    {
-        locate(coord);
         printf("%d", b->value);
-    }
 }
 
 // 初始化界面，棋盘为x行y列
-void initUI(int x, int y, int bs)
+void initUI()
 {
-    window_resize(x, y);
+    window_resize();
+    window_fix();
     system("title 2048"); //设置标题
     system("color F0");   //设置背景色为白色，前景色为黑色
     puts("2048控制台版 - made by Pecco\n");
     puts("W - 向上  A - 向左  S - 向下  D - 向右");
-    print_board(x, y, bs);
+    print_board();
 }
 
 // 对于x行y列的棋盘，设置窗口大小
-void window_resize(int x, int y)
+void window_resize()
 {
     char s[30] = "";
-    int lines = 7 + x * (BLOCK_SIZE + 1);
-    int cols = max(40, 3 + y * (BLOCK_SIZE * 2 + 1)); //cols不能小于40
+    int lines = 8 + MAXX * (BLOCK_SIZE + 1);
+    int cols = max(40, 3 + MAXY * (BLOCK_SIZE * 2 + 1)); //cols不能小于40
     sprintf(s, "mode con cols=%d lines=%d", cols, lines);
     system(s);
 }
 
-//打印棋盘n行，列数为y，格子大小为bs，可定制各种格式
-void print_board_line(const char head[], const char body[], const char crossing[], const char tail[], int y, int n, int bs)
+//使窗口大小不可改变
+void window_fix()
+{
+    SetWindowLongPtrA(
+        GetConsoleWindow(),
+        GWL_STYLE,
+        GetWindowLongPtrA(GetConsoleWindow(), GWL_STYLE) & ~WS_SIZEBOX & ~WS_MAXIMIZEBOX & ~WS_MINIMIZEBOX);
+}
+
+//打印棋盘n行，列数为y，可定制各种格式
+void print_board_line(const char head[], const char body[], const char crossing[],
+                      const char tail[], int y, int n)
 {
     for (int k = 0; k < n; ++k)
     {
         fputs(head, stdout);
         for (int j = 0; j < y - 1; ++j)
         {
-            for (int i = 0; i < bs * 2; ++i)
+            for (int i = 0; i < BLOCK_SIZE * 2; ++i)
                 fputs(body, stdout);
             fputs(crossing, stdout);
         }
-        for (int i = 0; i < bs * 2; ++i)
+        for (int i = 0; i < BLOCK_SIZE * 2; ++i)
             fputs(body, stdout);
         puts(tail);
     }
 }
 
-//打印棋盘头n行，列数为y，格子大小为bs
-void print_board_head(int y, int n, int bs)
+//打印棋盘头n行，列数为y
+void print_board_head(int y, int n)
 {
-    print_board_line("┌", "─", "┬", "┐", y, n, bs);
+    print_board_line("┌", "─", "┬", "┐", y, n);
 }
 
-//打印棋盘身n行，列数为y，格子大小为bs
-void print_board_body(int y, int n, int bs)
+//打印棋盘身n行，列数为y
+void print_board_body(int y, int n)
 {
-    print_board_line("│", " ", "│", "│", y, n, bs);
+    print_board_line("│", " ", "│", "│", y, n);
 }
 
-//打印棋盘交叉处n行，列数为y，格子大小为bs
-void print_board_crossing(int y, int n, int bs)
+//打印棋盘交叉处n行，列数为y
+void print_board_crossing(int y, int n)
 {
-    print_board_line("├", "─", "┼", "┤", y, n, bs);
+    print_board_line("├", "─", "┼", "┤", y, n);
 }
 
-//打印棋盘尾n行，列数为y，格子大小为bs
-void print_board_tail(int y, int n, int bs)
+//打印棋盘尾n行，列数为y
+void print_board_tail(int y, int n)
 {
-    print_board_line("└", "─", "┴", "┘", y, n, bs);
+    print_board_line("└", "─", "┴", "┘", y, n);
 }
 
-//打印x行y列的棋盘，格子大小为bs
-void print_board(int x, int y, int bs)
+//打印棋盘
+void print_board()
 {
-    print_board_head(y, 1, bs);
-    for (int i = 0; i < x - 1; ++i)
+    print_board_head(MAXY, 1);
+    for (int i = 0; i < MAXX - 1; ++i)
     {
-        print_board_body(y, bs, bs);
-        print_board_crossing(y, 1, bs);
+        print_board_body(MAXY, BLOCK_SIZE);
+        print_board_crossing(MAXY, 1);
     }
-    print_board_body(y, bs, bs);
-    print_board_tail(y, 1, bs);
+    print_board_body(MAXY, BLOCK_SIZE);
+    print_board_tail(MAXY, 1);
 }
