@@ -1,13 +1,5 @@
 #include "2048.h"
 
-int main()
-{
-    Init();
-    while (1)
-        Step();
-    return 0;
-}
-
 // 初始化
 void Init()
 {
@@ -20,14 +12,140 @@ void Init()
 void Step()
 {
     prepare_to_input();
-    char ch = getch();
-    if (ch == -32)
-        ch = getch();
-    //printf("%d", ch);///
-    //TODO:移动、合并
+    int ch = getch();
+    if (ch == 224)
+        ch = getch() + 1000;
+    move(ch);
+    reprint_all();
     judge();
-    if (has_space())
+}
+
+//根据输入处理移动
+void move(int ch)
+{
+    char c = 0;
+    if (ch == 'S' || ch == 's' || ch == 1080)
+        c = 'd';
+    if (ch == 'W' || ch == 'w' || ch == 1072)
+        c = 'u';
+    if (ch == 'A' || ch == 'a' || ch == 1075)
+        c = 'l';
+    if (ch == 'D' || ch == 'd' || ch == 1077)
+        c = 'r';
+    if (c && all_move(c))
         generate();
+}
+
+//获取方块在某个方向上紧挨着的方块，若达边界返回NULL
+block *get_neighbor(const block *b, char dir)
+{
+    switch (dir)
+    {
+    case 'l':
+        return b->y == 0 ? NULL : map[b->x][b->y - 1];
+    case 'r':
+        return b->y == MAXY - 1 ? NULL : map[b->x][b->y + 1];
+    case 'u':
+        return b->x == 0 ? NULL : map[b->x - 1][b->y];
+    case 'd':
+        return b->x == MAXX - 1 ? NULL : map[b->x + 1][b->y];
+    }
+}
+
+//得到方块往某个方向移动应该到达的位置
+block *get_end(block *bk, char dir)
+{
+    block *b = bk;
+    while (get_neighbor(b, dir) != NULL && get_neighbor(b, dir)->value == 0)
+        b = get_neighbor(b, dir);
+    return b;
+}
+
+//方块试图与某个方向上的相邻方块结合，结合成功返回1，否则返回0
+int combine_to(block *b, char dir)
+{
+    block *end = get_neighbor(b, dir);
+    if (end != NULL && b->value == end->value && end->combinable)
+    {
+        end->value *= 2;
+        b->value = 0;
+        end->combinable = 0;
+        return 1;
+    }
+    return 0;
+}
+
+//方块往某个方向移动，并试图结合，移动或结合成功返回1，否则返回0
+//同时支持把返回值存入某地址（若不需要令location为NULL即可）
+int move_to(block *b, char dir, int *location)
+{
+    int suc = 0;
+    block *end = get_end(b, dir);
+    if (end != b)
+    {
+        end->value = b->value;
+        b->value = 0;
+        suc = 1;
+    }
+    if (combine_to(end, dir))
+        suc = 1;
+    if (location != NULL)
+        *location = suc;
+    return suc;
+}
+
+//从下往上遍历所有方块
+void forall_d(int procedure(block *, char, int *), int *location)
+{
+    for (int i = MAXX - 1; i >= 0; --i)
+        for (int j = 0; j < MAXY; ++j)
+            procedure(map[i][j], 'd', location);
+}
+
+//从上往下遍历所有方块
+void forall_u(int procedure(block *, char, int *), int *location)
+{
+    for (int i = 0; i < MAXX - 1; ++i)
+        for (int j = 0; j < MAXY; ++j)
+            procedure(map[i][j], 'u', location);
+}
+
+//从左往右遍历所有方块
+void forall_l(int procedure(block *, char, int *), int *location)
+{
+    for (int j = 0; j < MAXY; ++j)
+        for (int i = MAXX - 1; i >= 0; --i)
+            procedure(map[i][j], 'l', location);
+}
+
+//从右往左遍历所有方块
+void forall_r(int procedure(block *, char, int *), int *location)
+{
+    for (int j = MAXY - 1; j >= 0; --j)
+        for (int i = MAXX - 1; i >= 0; --i)
+            procedure(map[i][j], 'r', location);
+}
+
+// 全部往某个方向移动，若移动或组合成功则返回1
+int all_move(char dir)
+{
+    all_combinable();
+    int suc = 0;
+    switch (dir)
+    {
+    case 'd':
+        forall_d(move_to, &suc);
+        break;
+    case 'u':
+        forall_u(move_to, &suc);
+        break;
+    case 'l':
+        forall_l(move_to, &suc);
+        break;
+    case 'r':
+        forall_r(move_to, &suc);
+    }
+    return suc;
 }
 
 //把光标移到输入区
@@ -63,8 +181,7 @@ int judge_lose()
 {
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
-            if ((i < MAXX - 1 && map[i + 1][j]->value == map[i][j]->value) ||
-                (j < MAXY - 1 && map[i][j + 1]->value == map[i][j]->value))
+            if ((i < MAXX - 1 && map[i + 1][j]->value == map[i][j]->value) || (j < MAXY - 1 && map[i][j + 1]->value == map[i][j]->value))
                 return 0;
     return 1;
 }
@@ -111,6 +228,14 @@ void win()
     }
 }
 
+//使所有方块可结合
+void all_combinable()
+{
+    for (int i = 0; i < MAXX; ++i)
+        for (int j = 0; j < MAXY; ++j)
+            map[i][j]->combinable = 1;
+}
+
 //清空输入区
 void empty_input_area()
 {
@@ -129,6 +254,11 @@ void new_game()
             set_block_value(i, j, 0);
     generate();
     generate();
+    // set_block_value(0, 0, 8); ///
+    // set_block_value(1, 0, 4); ///
+    // set_block_value(2, 0, 2); ///
+    // set_block_value(3, 0, 2); ///
+    reprint_all();
 }
 
 // 返回一个十进制整数的位数
@@ -153,10 +283,7 @@ void locate(COORD coord)
 COORD get_coord(const block *b)
 {
     COORD coord;
-    if (b->value)
-        coord.X = 1 + (BLOCK_SIZE * 2 + 1) * b->y + (BLOCK_SIZE * 2 - cnt_digits(b->value) + 1) / 2;
-    else
-        coord.X = 1 + (BLOCK_SIZE * 2 + 1) * b->y;
+    coord.X = 1 + (BLOCK_SIZE * 2 + 1) * b->y;
     coord.Y = 3 + (BLOCK_SIZE + 1) * b->x + (BLOCK_SIZE + 1) / 2;
     return coord;
 }
@@ -191,6 +318,14 @@ int has_space()
     return suc;
 }
 
+// 重新打印所有方块
+void reprint_all()
+{
+    for (int i = 0; i < MAXX; ++i)
+        for (int j = 0; j < MAXY; ++j)
+            print_block(i, j);
+}
+
 //随机生成2或4
 void generate()
 {
@@ -215,11 +350,10 @@ void init_map()
             map[i][j] = new_block(i, j);
 }
 
-// 设置某坐标的方块的值，并打印
-int set_block_value(int i, int j, int value)
+// 设置某坐标的方块的值
+void set_block_value(int i, int j, int value)
 {
     map[i][j]->value = value;
-    print_block(i, j);
 }
 
 // 打印某坐标的方块，如果方块的值是0则清空该格
@@ -228,11 +362,14 @@ void print_block(int i, int j)
     block *b = map[i][j];
     COORD coord = get_coord(b);
     locate(coord);
-    if (b->value == 0)
-        for (int i = 0; i < BLOCK_SIZE * 2; ++i)
-            putchar(' ');
-    else
+    for (int i = 0; i < BLOCK_SIZE * 2; ++i)
+        putchar(' ');
+    if (map[i][j]->value)
+    {
+        coord.X += (BLOCK_SIZE * 2 - cnt_digits(b->value) + 1) / 2; //居中对齐
+        locate(coord);
         printf("%d", b->value);
+    }
 }
 
 // 初始化界面，棋盘为x行y列
@@ -240,6 +377,7 @@ void initUI()
 {
     window_resize();
     window_fix();
+    hide_cursor();
     system("title 2048"); //设置标题
     system("color F0");   //设置背景色为白色，前景色为黑色
     puts("2048控制台版 - made by Pecco\n");
@@ -247,12 +385,12 @@ void initUI()
     print_board();
 }
 
-// 对于x行y列的棋盘，设置窗口大小
+// 根据格子的多少和大小设置窗口大小
 void window_resize()
 {
     char s[30] = "";
     int lines = 8 + MAXX * (BLOCK_SIZE + 1);
-    int cols = max(40, 3 + MAXY * (BLOCK_SIZE * 2 + 1)); //cols不能小于40
+    int cols = max(40, 3 + MAXY * (BLOCK_SIZE * 2 + 1)); // cols不能小于40
     sprintf(s, "mode con cols=%d lines=%d", cols, lines);
     system(s);
 }
@@ -261,14 +399,22 @@ void window_resize()
 void window_fix()
 {
     SetWindowLongPtrA(
-        GetConsoleWindow(),
-        GWL_STYLE,
+        GetConsoleWindow(), GWL_STYLE,
         GetWindowLongPtrA(GetConsoleWindow(), GWL_STYLE) & ~WS_SIZEBOX & ~WS_MAXIMIZEBOX & ~WS_MINIMIZEBOX);
 }
 
+//隐藏光标
+void hide_cursor()
+{
+    CONSOLE_CURSOR_INFO cursor;
+    cursor.bVisible = FALSE;
+    cursor.dwSize = sizeof(cursor);
+    HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleCursorInfo(handle, &cursor);
+}
+
 //打印棋盘n行，列数为y，可定制各种格式
-void print_board_line(const char head[], const char body[], const char crossing[],
-                      const char tail[], int y, int n)
+void print_board_line(const char head[], const char body[], const char crossing[], const char tail[], int y, int n)
 {
     for (int k = 0; k < n; ++k)
     {
