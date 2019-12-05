@@ -1,12 +1,7 @@
 #ifndef _2048_H_
 #define _2048_H_
 #define max(a, b) ({int _a = a; int _b = b; _a > _b ? _a : _b; })
-#define swap(a, b) ({int *_a = &a; int *_b = &b; int _t = *_a; *_a = *_b; *_b = _t; })
-#define MAXX 4
-#define MAXY 4
-#define GOAL 2048
-#define BLOCK_SIZE 3
-#define AUTO_SAVE 1
+#define swap(a, b) ({int *_a = &a; int *_b = &b; int _t = *_a; *_a = *_b; *_b = _t; }
 #define ROF 10 //出现4的频率的倒数（Reciprocal of Frequency）
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,8 +21,8 @@ typedef struct
     int x, y, value, combinable;
 } block;
 
-//游戏地图，存储方块指针
-block *Map[MAXX][MAXY];
+//游戏地图，存储方块指针，动态分配内存
+block ***Map;
 
 //游戏的最高分和最低分
 unsigned long long Pts, Bests;
@@ -35,10 +30,17 @@ unsigned long long Pts, Bests;
 //控制台的行数和列数
 int Lines, Cols;
 
+//从.config中读取的参数
+int MAXX, MAXY, GOAL, BLOCK_SIZE;
+char AUTO_SAVE;
+
 void Init();
 void Step();
 
 int count_digits(int n);
+
+void init_config();
+void open_config();
 
 void prepare_to_input();
 void empty_input_area();
@@ -52,6 +54,7 @@ int judge_lose();
 int judge_win();
 void lose();
 void win();
+void new_or_continue();
 
 void init_map();
 void generate();
@@ -77,7 +80,7 @@ void window_resize();
 void window_fix();
 void locate(COORD coord);
 void hide_cursor();
-void set_text_color(int ForeColor, int BackColor);
+void set_text_color(int color);
 void color_puts(char *string, int color);
 
 void init_hist();
@@ -96,7 +99,7 @@ void print_board();
 void reprint_all();
 void update_pts();
 
-void trigger_warning(enum warning w);
-void warn_unmatch_save_format();
+void trigger_warning(enum warning w, int v1, int v2);
+void warn_unmatch_save_format(int x, int y);
 
 #endif

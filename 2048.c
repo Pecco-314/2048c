@@ -3,6 +3,7 @@
 // 初始化
 void Init()
 {
+    init_config();
     initUI();
     init_map();
     load_game();
@@ -18,7 +19,7 @@ void Step()
         ch = getch() + 1000;
     process_input(ch);
     reprint_all();
-    if (AUTO_SAVE)
+    if (AUTO_SAVE == 'Y')
         save_game();
     judge();
 }
@@ -50,8 +51,8 @@ void load_game()
                 fscanf(save, "%d", &Map[i][j]->value);
         fscanf(save, "%llu%llu", &Pts, &Bests); //读取分数
         fclose(save);
-        if (x != MAXX || y != MAXY) //如果棋盘大小不匹配，触发一个警告
-            trigger_warning(UNMATCH_SAVE_FORMAT);
+        while (x != MAXX || y != MAXY) //如果棋盘大小不匹配，触发一个警告
+            trigger_warning(UNMATCH_SAVE_FORMAT, x, y);
         reprint_all();
         save_game();
     }
@@ -154,9 +155,13 @@ void process_input(int ch)
         new_game();
     else if (ch == 1059) //F1：帮助
         WinExec("notepad.exe help.txt", SW_SHOW);
-    else if (ch == 'Q' || ch == 'q') //Q：退出
+    else if (ch == 'C' || ch == 'c') // C：配置
+        open_config();
+    else if (ch == 'Q' || ch == 'q') // Q：退出
         exit(0);
-    else if (ch == 'Z' || ch == 'z') //Z:撤回
+    else if (ch == 'R' || ch == 'r') // R：重新初始化
+        Init();
+    else if (ch == 'Z' || ch == 'z') // Z：撤回
     {
         withdraw_step();
         return; //不保存历史
@@ -164,6 +169,25 @@ void process_input(int ch)
     if (c && all_move(c))
         generate();
     save_history();
+}
+
+//打开配置文件
+void open_config()
+{
+    char ch;
+    WinExec("notepad.exe .config", SW_SHOW);
+    empty_input_area();
+    prepare_to_input();
+    color_puts("配置文件可能已改变，是否重新初始化游戏？\n Y - 是  N - 不", 1);
+    while (ch = getch())
+    {
+        if (ch == 'Y' || ch == 'y')
+            Init();
+        if (ch == 'Y' || ch == 'y' || ch == 'N' || ch == 'n')
+            break;
+    }
+    empty_input_area();
+    prepare_to_input();
 }
 
 //获取方块在某个方向上紧挨着的方块，若达边界返回NULL
@@ -295,9 +319,7 @@ void prepare_to_input()
 //判断游戏胜负情况
 void judge()
 {
-    if (has_space())
-        return;
-    else if (judge_win())
+    if (judge_win())
         win();
     else if (judge_lose())
         lose();
@@ -316,6 +338,8 @@ int judge_win()
 //判断是否失败，失败返回1
 int judge_lose()
 {
+    if (has_space())
+        return 0;
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
             if ((i < MAXX - 1 && Map[i + 1][j]->value == Map[i][j]->value) || (j < MAXY - 1 && Map[i][j + 1]->value == Map[i][j]->value))
@@ -327,43 +351,32 @@ int judge_lose()
 void lose()
 {
     prepare_to_input();
-    puts("已无可移动的方块，游戏失败。\n N - 新游戏  C - 继续游戏");
-    char c = getch();
-    while (1)
-    {
-        switch (c)
-        {
-        case 'N':
-        case 'n':
-            new_game(); //FALLTROUGH
-        case 'C':
-        case 'c':
-            empty_input_area();
-            return;
-        }
-        c = getch();
-    }
+    color_puts("已无可移动的方块，游戏失败。\n N - 新游戏  C - 继续游戏\a", 12);
+    new_or_continue();
 }
 
 //游戏胜利处理
 void win()
 {
     prepare_to_input();
-    puts("游戏胜利，恭喜！\n N - 新游戏  C - 继续游戏");
-    char c = getch();
-    while (1)
+    color_puts("游戏胜利，恭喜！\n N - 新游戏  C - 继续游戏", 3);
+    new_or_continue();
+    char c;
+}
+
+//用户选择新游戏或继续游戏
+void new_or_continue()
+{
+    char c;
+    while (c = getch())
     {
-        switch (c)
-        {
-        case 'N':
-        case 'n':
+        if (c == 'N' || c == 'n')
             new_game();
-        case 'C':
-        case 'c':
+        if (c == 'c' || c == 'C' || c == 'N' || c == 'n')
+        {
             empty_input_area();
-            return;
+            break;
         }
-        c = getch();
     }
 }
 
@@ -491,9 +504,21 @@ void generate()
     }
 }
 
+//初始化配置
+void init_config()
+{
+    FILE *config = fopen(".config", "r");
+    fscanf(config, "%*s%*s%*s%d%*s%d%*s%d%*s%d%*s %c", &MAXX, &MAXY, &BLOCK_SIZE, &GOAL, &AUTO_SAVE);
+    //手动跳过注释，这样写不太好，但我不想写复杂的字符串处理
+    fclose(config);
+}
+
 //初始化游戏地图数组
 void init_map()
 {
+    Map = (block ***)malloc(sizeof(block **) * MAXX);
+    for (int i = 0; i < MAXX; ++i)
+        Map[i] = (block **)malloc(sizeof(block *) * MAXY);
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
             Map[i][j] = new_block(i, j);
@@ -620,42 +645,57 @@ void print_board()
     puts("最高：");
 }
 
-//触发警告
-void trigger_warning(enum warning w)
+//触发警告，v1和v2是可选项，若不需要则为0
+void trigger_warning(enum warning w, int v1, int v2)
 {
     switch (w)
     {
     case UNMATCH_SAVE_FORMAT:
-        warn_unmatch_save_format();
+        warn_unmatch_save_format(v1, v2);
     }
 }
 
 //存档格式不匹配警告
-void warn_unmatch_save_format()
+void warn_unmatch_save_format(int x, int y)
 {
     prepare_to_input();
-    color_puts("警告：存档的棋盘大小与配置不统一\n N - 新游戏", 4);
+    set_text_color(4);
+    printf("警告：存档的棋盘大小与配置不统一\n"
+           "存档为：%d行%d列  配置为：%d行%d列\n"
+           "N - 新游戏  C - 修改配置  Q - 退出",
+           x, y, MAXX, MAXY);
+    set_text_color(0);
     char c;
     while ((c = getch()) != 'n' && c != 'N')
-        ;
+    {
+        if (c == 'c' || c == 'C')
+        {
+            open_config();
+            return;
+        }
+        if (c == 'q' || c == 'Q')
+            exit(0);
+    }
     new_game();
     empty_input_area();
 }
 
 //设置文字颜色
-// 0-黑 1-蓝 2-绿 3-浅绿 4-红 5-紫 6-黄 7-白 8-灰 9-淡蓝
+// 0-黑 1-蓝 2-绿 3-浅蓝 4-红 5-紫 6-黄 7-白 8-灰 9-淡蓝
 // 10-淡绿 11-淡浅绿 12-淡红 13-淡紫 14-淡黄 15-亮白
-void set_text_color(int ForeColor, int BackColor)
+void set_text_color(int color)
 {
     HANDLE winHandle; //句柄
     winHandle = GetStdHandle(STD_OUTPUT_HANDLE);
-    SetConsoleTextAttribute(winHandle, ForeColor + BackColor * 0x10);
+    SetConsoleTextAttribute(winHandle, color + 240);
 }
 
 //带颜色的puts
+// 0-黑 1-蓝 2-绿 3-浅蓝 4-红 5-紫 6-黄 7-白 8-灰 9-淡蓝
+// 10-淡绿 11-淡浅绿 12-淡红 13-淡紫 14-淡黄 15-亮白
 void color_puts(char *string, int color)
 {
-    set_text_color(color, 15);
+    set_text_color(color);
     puts(string);
-    set_text_color(0, 15);
+    set_text_color(0);
 }
