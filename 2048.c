@@ -26,11 +26,11 @@ void move(int ch)
     char c = 0;
     if (ch == 'S' || ch == 's' || ch == 1080)
         c = 'd';
-    if (ch == 'W' || ch == 'w' || ch == 1072)
+    else if (ch == 'W' || ch == 'w' || ch == 1072)
         c = 'u';
-    if (ch == 'A' || ch == 'a' || ch == 1075)
+    else if (ch == 'A' || ch == 'a' || ch == 1075)
         c = 'l';
-    if (ch == 'D' || ch == 'd' || ch == 1077)
+    else if (ch == 'D' || ch == 'd' || ch == 1077)
         c = 'r';
     if (c && all_move(c))
         generate();
@@ -76,76 +76,81 @@ int combine_to(block *b, char dir)
 }
 
 //方块往某个方向移动，并试图结合，移动或结合成功返回1，否则返回0
-//同时支持把返回值存入某地址（若不需要令location为NULL即可）
-int move_to(block *b, char dir, int *location)
+int move_to(block *b, char dir)
 {
-    int suc = 0;
+    int sec = 0;
     block *end = get_end(b, dir);
-    if (end != b)
+    if (end != b && b->value)
     {
         end->value = b->value;
         b->value = 0;
-        suc = 1;
+        sec = 1;
     }
     if (combine_to(end, dir))
-        suc = 1;
-    if (location != NULL)
-        *location = suc;
-    return suc;
+        sec = 1;
+    return sec;
 }
 
 //从下往上遍历所有方块
-void forall_d(int procedure(block *, char, int *), int *location)
+int forall_d(int procedure(block *, char))
 {
+    int sec = 0;
     for (int i = MAXX - 1; i >= 0; --i)
         for (int j = 0; j < MAXY; ++j)
-            procedure(map[i][j], 'd', location);
+            sec = max(sec, procedure(map[i][j], 'd'));
+    return sec;
 }
 
 //从上往下遍历所有方块
-void forall_u(int procedure(block *, char, int *), int *location)
+int forall_u(int procedure(block *, char))
 {
-    for (int i = 0; i < MAXX - 1; ++i)
+    int sec = 0;
+    for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
-            procedure(map[i][j], 'u', location);
+            sec = max(sec, procedure(map[i][j], 'u'));
+    return sec;
 }
 
 //从左往右遍历所有方块
-void forall_l(int procedure(block *, char, int *), int *location)
+int forall_l(int procedure(block *, char))
 {
+    int sec = 0;
     for (int j = 0; j < MAXY; ++j)
         for (int i = MAXX - 1; i >= 0; --i)
-            procedure(map[i][j], 'l', location);
+            sec = max(sec, procedure(map[i][j], 'l'));
+    return sec;
 }
 
 //从右往左遍历所有方块
-void forall_r(int procedure(block *, char, int *), int *location)
+int forall_r(int procedure(block *, char))
 {
+    int sec = 0;
     for (int j = MAXY - 1; j >= 0; --j)
         for (int i = MAXX - 1; i >= 0; --i)
-            procedure(map[i][j], 'r', location);
+            sec = max(sec, procedure(map[i][j], 'r'));
+    return sec;
 }
 
 // 全部往某个方向移动，若移动或组合成功则返回1
 int all_move(char dir)
 {
     all_combinable();
-    int suc = 0;
+    int sec = 0;
     switch (dir)
     {
     case 'd':
-        forall_d(move_to, &suc);
+        sec = max(sec, forall_d(move_to));
         break;
     case 'u':
-        forall_u(move_to, &suc);
+        sec = max(sec, forall_u(move_to));
         break;
     case 'l':
-        forall_l(move_to, &suc);
+        sec = max(sec, forall_l(move_to));
         break;
     case 'r':
-        forall_r(move_to, &suc);
+        sec = max(sec, forall_r(move_to));
     }
-    return suc;
+    return sec;
 }
 
 //把光标移到输入区
@@ -254,10 +259,6 @@ void new_game()
             set_block_value(i, j, 0);
     generate();
     generate();
-    // set_block_value(0, 0, 8); ///
-    // set_block_value(1, 0, 4); ///
-    // set_block_value(2, 0, 2); ///
-    // set_block_value(3, 0, 2); ///
     reprint_all();
 }
 
@@ -301,21 +302,21 @@ block *new_block(int x, int y)
 //查询有无空位
 int has_space()
 {
-    int suc = 0;
+    int sec = 0;
     for (int i = 0; i < MAXX; ++i)
     {
         for (int j = 0; j < MAXY; ++j)
         {
             if (map[i][j]->value == 0)
             {
-                suc = 1;
+                sec = 1;
                 break;
             }
         }
-        if (suc)
+        if (sec)
             break;
     }
-    return suc;
+    return sec;
 }
 
 // 重新打印所有方块
@@ -418,15 +419,15 @@ void print_board_line(const char head[], const char body[], const char crossing[
 {
     for (int k = 0; k < n; ++k)
     {
-        fputs(head, stdout);
+        printf("%s", head);
         for (int j = 0; j < y - 1; ++j)
         {
             for (int i = 0; i < BLOCK_SIZE * 2; ++i)
-                fputs(body, stdout);
-            fputs(crossing, stdout);
+                printf("%s", body);
+            printf("%s", crossing);
         }
         for (int i = 0; i < BLOCK_SIZE * 2; ++i)
-            fputs(body, stdout);
+            printf("%s", body);
         puts(tail);
     }
 }

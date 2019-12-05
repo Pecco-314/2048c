@@ -1,27 +1,25 @@
 #ifndef _2048_H_
 #define _2048_H_
+#define max(a, b) ({int _a = a; int _b = b; _a > _b ? _a : _b; })
+#define swap(a, b) ({int *_a = &a; int *_b = &b; int _t = *_a; *_a = *_b; *_b = _t; })
+#define MAXX 4
+#define MAXY 4
+#define BLOCK_SIZE 3
+#define GOAL 2048
+#define ROF 10 //³öÏÖ4µÄÆµÂÊµÄµ¹Êı£¨Reciprocal of Frequency£©
 #include <stdio.h>
 #include <stdlib.h>
 #include <conio.h>
 #include <windows.h>
 #include <time.h>
-#define max(a, b) (((a) > (b)) ? (a) : (b))
-#define swap(a, b) \
-    if (a != b)    \
-    a ^= b ^= a ^= b
-#define MAXX 4
-#define MAXY 4
-#define BLOCK_SIZE 3
-#define GOAL 2048
-#define ROF 10 //å‡ºç°4çš„é¢‘ç‡çš„å€’æ•°ï¼ˆReciprocal of Frequencyï¼‰
 
-// æ–¹å—ï¼ŒåŒ…å«æ¨ªåæ ‡ï¼Œçºµåæ ‡ï¼Œå€¼å’Œå¯ç»“åˆæ€§
+// ·½¿é£¬°üº¬ºá×ø±ê£¬×İ×ø±ê£¬ÖµºÍ¿É½áºÏĞÔ
 typedef struct
 {
     int x, y, value, combinable;
 } block;
 
-//æ¸¸æˆåœ°å›¾ï¼Œå­˜å‚¨æ–¹å—æŒ‡é’ˆ
+//ÓÎÏ·µØÍ¼£¬´æ´¢·½¿éÖ¸Õë
 block *map[MAXX][MAXY];
 
 void Init();
@@ -45,10 +43,10 @@ void reprint_all();
 void init_map();
 void generate();
 void all_combinable();
-void forall_d(int procedure(block *, char, int *), int *location);
-void forall_u(int procedure(block *, char, int *), int *location);
-void forall_l(int procedure(block *, char, int *), int *location);
-void forall_r(int procedure(block *, char, int *), int *location);
+int forall_d(int procedure(block *, char));
+int forall_u(int procedure(block *, char));
+int forall_l(int procedure(block *, char));
+int forall_r(int procedure(block *, char));
 int all_move(char dir);
 
 void set_block_value(int i, int j, int value);
@@ -57,7 +55,7 @@ block *new_block(int x, int y);
 block *get_neighbor(const block *b, char dir);
 block *get_end(block *bk, char dir);
 int combine_to(block *b, char dir);
-int move_to(block *b, char dir, int *location);
+int move_to(block *b, char dir);
 COORD get_coord(const block *b);
 
 void initUI();
