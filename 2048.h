@@ -3,9 +3,9 @@
 #define max(a, b) ({int _a = a; int _b = b; _a > _b ? _a : _b; })
 #define swap(a, b) ({int *_a = &a; int *_b = &b; int _t = *_a; *_a = *_b; *_b = _t; })
 #define MAXX 4
-#define MAXY 3
+#define MAXY 4
 #define GOAL 2048
-#define BLOCK_SIZE 5
+#define BLOCK_SIZE 3
 #define AUTO_SAVE 1
 #define ROF 10 //出现4的频率的倒数（Reciprocal of Frequency）
 #include <stdio.h>
@@ -27,22 +27,22 @@ typedef struct
 } block;
 
 //游戏地图，存储方块指针
-block *map[MAXX][MAXY];
+block *Map[MAXX][MAXY];
 
 //游戏的最高分和最低分
-unsigned long long pts, bests;
+unsigned long long Pts, Bests;
 
 //控制台的行数和列数
-int lines, cols;
+int Lines, Cols;
 
 void Init();
 void Step();
 
-int cnt_digits(int n);
+int count_digits(int n);
 
 void prepare_to_input();
 void empty_input_area();
-void move(int ch);
+void process_input(int ch);
 
 void save_game();
 void load_game();
@@ -80,6 +80,13 @@ void hide_cursor();
 void set_text_color(int ForeColor, int BackColor);
 void color_puts(char *string, int color);
 
+void init_hist();
+void save_history();
+int count_lines(char *filename);
+void delete_last_line(char *filename);
+void update_from_last_line();
+void withdraw_step();
+
 void print_board_line(const char head[], const char body[], const char crossing[], const char tail[], int y, int n);
 void print_board_head(int y, int n);
 void print_board_body(int y, int n);
@@ -88,6 +95,7 @@ void print_board_tail(int y, int n);
 void print_board();
 void reprint_all();
 void update_pts();
+
 void trigger_warning(enum warning w);
 void warn_unmatch_save_format();
 

@@ -6,6 +6,7 @@ void Init()
     initUI();
     init_map();
     load_game();
+    init_hist();
 }
 
 // 处理每一步的操作
@@ -15,7 +16,7 @@ void Step()
     int ch = getch();
     if (ch == 224 || ch == 0)
         ch = getch() + 1000;
-    move(ch);
+    process_input(ch);
     reprint_all();
     if (AUTO_SAVE)
         save_game();
@@ -30,8 +31,8 @@ void save_game()
     fprintf(save, "%d %d ", MAXX, MAXY); //存储当前棋盘的大小
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
-            fprintf(save, "%d ", map[i][j]->value);
-    fprintf(save, "%llu %llu", pts, bests);
+            fprintf(save, "%d ", Map[i][j]->value);
+    fprintf(save, "%llu %llu", Pts, Bests);
     fclose(save);
     system("attrib +r save.dat"); //设置存档文件只读
 }
@@ -43,13 +44,13 @@ void load_game()
     if (save != NULL)
     {
         int x, y;
-        fscanf(save, "%d%d", &x, &y);
+        fscanf(save, "%d%d", &x, &y); //读取棋盘大小
         for (int i = 0; i < MAXX; ++i)
             for (int j = 0; j < MAXY; ++j)
-                fscanf(save, "%d", &map[i][j]->value);
-        fscanf(save, "%llu%llu", &pts, &bests);
+                fscanf(save, "%d", &Map[i][j]->value);
+        fscanf(save, "%llu%llu", &Pts, &Bests); //读取分数
         fclose(save);
-        if (x != MAXX || y != MAXY)
+        if (x != MAXX || y != MAXY) //如果棋盘大小不匹配，触发一个警告
             trigger_warning(UNMATCH_SAVE_FORMAT);
         reprint_all();
         save_game();
@@ -58,8 +59,87 @@ void load_game()
         new_game();
 }
 
+//储存历史
+void save_history()
+{
+    system("attrib -r -h hist.dat"); //取消历史文件的只读和隐藏
+    FILE *hist = fopen("hist.dat", "a");
+    for (int i = 0; i < MAXX; ++i)
+        for (int j = 0; j < MAXY; ++j)
+            fprintf(hist, "%d ", Map[i][j]->value);
+    fprintf(hist, "%llu %llu\n", Pts, Bests);
+    fclose(hist);
+    system("attrib +r +h hist.dat"); //设置历史文件为只读且隐藏
+}
+
+//初始化历史文件（隐藏且只读），如果原来存在则删除
+void init_hist()
+{
+    system("attrib -r -h hist.dat"); //取消原来存在的历史文件的只读和隐藏
+    FILE *hist = fopen("hist.dat", "w");
+    fclose(hist);
+    save_history();
+    system("attrib +r +h hist.dat"); //设置历史文件为隐藏且只读
+}
+
+//用hist文件的最后一步更新当前棋盘
+void update_from_last_line()
+{
+    char buffer[1000];
+    int cntlines = count_lines("hist.dat");
+    FILE *hist = fopen("hist.dat", "r");
+    for (int i = 0; i < cntlines - 1; ++i)
+        fgets(buffer, sizeof(buffer), hist);
+    for (int i = 0; i < MAXX; ++i)
+        for (int j = 0; j < MAXY; ++j)
+            fscanf(hist, "%d", &Map[i][j]->value);
+    fscanf(hist, "%llu%llu", &Pts, &Bests);
+    reprint_all();
+    fclose(hist);
+}
+
+//撤回一步
+void withdraw_step()
+{
+    system("attrib -r -h hist.dat");
+    delete_last_line("hist.dat");
+    update_from_last_line();
+    system("attrib +r +h hist.dat");
+}
+
+//获取一个文件的行数
+int count_lines(char *filename)
+{
+    int cnt = 0;
+    char ch;
+    FILE *file = fopen(filename, "r");
+    while ((ch = fgetc(file)) != EOF)
+        if (ch == '\n')
+            cnt++;
+    fclose(file);
+    return cnt;
+}
+
+//删除某个文件的最后一行
+void delete_last_line(char *filename)
+{
+    char buffer[1000];
+    int cntlines = count_lines(filename);
+    FILE *file = fopen(filename, "r");
+    FILE *temp = fopen("temp.dat", "w");
+    for (int i = 0; i < cntlines - 1; ++i)
+    {
+        fgets(buffer, sizeof(buffer), file);
+        fputs(buffer, temp);
+    }
+    fclose(file);
+    fclose(temp);
+    remove(filename);
+    rename("temp.dat", filename);
+}
+
 //根据输入处理移动
-void move(int ch)
+void process_input(int ch)
 {
     char c = 0;
     if (ch == 'S' || ch == 's' || ch == 1080)
@@ -70,12 +150,20 @@ void move(int ch)
         c = 'l';
     else if (ch == 'D' || ch == 'd' || ch == 1077)
         c = 'r';
-    else if (ch == 1063)
+    else if (ch == 1063) //F5：新游戏
         new_game();
-    else if (ch == 1059)
+    else if (ch == 1059) //F1：帮助
         WinExec("notepad.exe help.txt", SW_SHOW);
+    else if (ch == 'Q' || ch == 'q') //Q：退出
+        exit(0);
+    else if (ch == 'Z' || ch == 'z') //Z:撤回
+    {
+        withdraw_step();
+        return; //不保存历史
+    }
     if (c && all_move(c))
         generate();
+    save_history();
 }
 
 //获取方块在某个方向上紧挨着的方块，若达边界返回NULL
@@ -84,13 +172,13 @@ block *get_neighbor(const block *b, char dir)
     switch (dir)
     {
     case 'l':
-        return b->y == 0 ? NULL : map[b->x][b->y - 1];
+        return b->y == 0 ? NULL : Map[b->x][b->y - 1];
     case 'r':
-        return b->y == MAXY - 1 ? NULL : map[b->x][b->y + 1];
+        return b->y == MAXY - 1 ? NULL : Map[b->x][b->y + 1];
     case 'u':
-        return b->x == 0 ? NULL : map[b->x - 1][b->y];
+        return b->x == 0 ? NULL : Map[b->x - 1][b->y];
     case 'd':
-        return b->x == MAXX - 1 ? NULL : map[b->x + 1][b->y];
+        return b->x == MAXX - 1 ? NULL : Map[b->x + 1][b->y];
     }
 }
 
@@ -112,8 +200,8 @@ int combine_to(block *b, char dir)
         end->value *= 2;
         b->value = 0;
         end->combinable = 0;
-        pts += end->value;
-        bests = max(bests, pts);
+        Pts += end->value;
+        Bests = max(Bests, Pts);
         return 1;
     }
     return 0;
@@ -141,7 +229,7 @@ int forall_d(int procedure(block *, char))
     int sec = 0;
     for (int i = MAXX - 1; i >= 0; --i)
         for (int j = 0; j < MAXY; ++j)
-            sec = max(sec, procedure(map[i][j], 'd'));
+            sec = max(sec, procedure(Map[i][j], 'd'));
     return sec;
 }
 
@@ -151,7 +239,7 @@ int forall_u(int procedure(block *, char))
     int sec = 0;
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
-            sec = max(sec, procedure(map[i][j], 'u'));
+            sec = max(sec, procedure(Map[i][j], 'u'));
     return sec;
 }
 
@@ -161,7 +249,7 @@ int forall_l(int procedure(block *, char))
     int sec = 0;
     for (int j = 0; j < MAXY; ++j)
         for (int i = MAXX - 1; i >= 0; --i)
-            sec = max(sec, procedure(map[i][j], 'l'));
+            sec = max(sec, procedure(Map[i][j], 'l'));
     return sec;
 }
 
@@ -171,7 +259,7 @@ int forall_r(int procedure(block *, char))
     int sec = 0;
     for (int j = MAXY - 1; j >= 0; --j)
         for (int i = MAXX - 1; i >= 0; --i)
-            sec = max(sec, procedure(map[i][j], 'r'));
+            sec = max(sec, procedure(Map[i][j], 'r'));
     return sec;
 }
 
@@ -220,7 +308,7 @@ int judge_win()
 {
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
-            if (map[i][j]->value == GOAL)
+            if (Map[i][j]->value == GOAL)
                 return 1;
     return 0;
 }
@@ -230,7 +318,7 @@ int judge_lose()
 {
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
-            if ((i < MAXX - 1 && map[i + 1][j]->value == map[i][j]->value) || (j < MAXY - 1 && map[i][j + 1]->value == map[i][j]->value))
+            if ((i < MAXX - 1 && Map[i + 1][j]->value == Map[i][j]->value) || (j < MAXY - 1 && Map[i][j + 1]->value == Map[i][j]->value))
                 return 0;
     return 1;
 }
@@ -284,7 +372,7 @@ void all_combinable()
 {
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
-            map[i][j]->combinable = 1;
+            Map[i][j]->combinable = 1;
 }
 
 //清空输入区
@@ -292,7 +380,7 @@ void empty_input_area()
 {
     prepare_to_input();
     for (int i = 0; i < 3; ++i)
-        for (int j = 0; j < cols; ++j)
+        for (int j = 0; j < Cols; ++j)
             putchar(' ');
     prepare_to_input();
 }
@@ -306,12 +394,12 @@ void new_game()
     generate();
     generate();
     save_game();
-    pts = 0;
+    Pts = 0;
     reprint_all();
 }
 
 // 返回一个十进制整数的位数
-int cnt_digits(int n)
+int count_digits(int n)
 {
     int digits = 0;
     while (n)
@@ -355,7 +443,7 @@ int has_space()
     {
         for (int j = 0; j < MAXY; ++j)
         {
-            if (map[i][j]->value == 0)
+            if (Map[i][j]->value == 0)
             {
                 sec = 1;
                 break;
@@ -381,10 +469,10 @@ void update_pts()
 {
     COORD coord = {7, (BLOCK_SIZE + 1) * MAXX + 4};
     locate(coord); //定位到打印分数的位置
-    printf("%-*llu", cols - 7, pts);
+    printf("%-*llu", Cols - 7, Pts);
     coord.Y += 1;
     locate(coord);
-    printf("%-*llu", cols - 7, bests);
+    printf("%-*llu", Cols - 7, Bests);
 }
 
 //随机生成2或4
@@ -395,7 +483,7 @@ void generate()
     while (1)
     {
         int x = rand() % MAXX, y = rand() % MAXY;
-        if (map[x][y]->value == 0)
+        if (Map[x][y]->value == 0)
         {
             set_block_value(x, y, v);
             break;
@@ -408,26 +496,26 @@ void init_map()
 {
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
-            map[i][j] = new_block(i, j);
+            Map[i][j] = new_block(i, j);
 }
 
 // 设置某坐标的方块的值
 void set_block_value(int i, int j, int value)
 {
-    map[i][j]->value = value;
+    Map[i][j]->value = value;
 }
 
 // 打印某坐标的方块，如果方块的值是0则清空该格
 void print_block(int i, int j)
 {
-    block *b = map[i][j];
+    block *b = Map[i][j];
     COORD coord = get_coord(b);
     locate(coord);
     for (int i = 0; i < BLOCK_SIZE * 2; ++i)
         putchar(' ');
-    if (map[i][j]->value)
+    if (Map[i][j]->value)
     {
-        coord.X += (BLOCK_SIZE * 2 - cnt_digits(b->value) + 1) / 2; //居中对齐
+        coord.X += (BLOCK_SIZE * 2 - count_digits(b->value) + 1) / 2; //居中对齐
         locate(coord);
         printf("%d", b->value);
     }
@@ -450,9 +538,9 @@ void initUI()
 void window_resize()
 {
     char s[30] = "";
-    lines = 9 + MAXX * (BLOCK_SIZE + 1);
-    cols = max(46, 3 + MAXY * (BLOCK_SIZE * 2 + 1)); // cols不能小于46
-    sprintf(s, "mode con cols=%d lines=%d", cols, lines);
+    Lines = 9 + MAXX * (BLOCK_SIZE + 1);
+    Cols = max(46, 3 + MAXY * (BLOCK_SIZE * 2 + 1)); // Cols不能小于46
+    sprintf(s, "mode con cols=%d lines=%d", Cols, Lines);
     system(s);
 }
 
@@ -532,6 +620,7 @@ void print_board()
     puts("最高：");
 }
 
+//触发警告
 void trigger_warning(enum warning w)
 {
     switch (w)
@@ -541,23 +630,16 @@ void trigger_warning(enum warning w)
     }
 }
 
+//存档格式不匹配警告
 void warn_unmatch_save_format()
 {
     prepare_to_input();
-    color_puts("错误：存档的棋盘大小与配置不统一\n N - 新游戏", 4);
-    char c = getch();
-    while (1)
-    {
-        switch (c)
-        {
-        case 'N':
-        case 'n':
-            new_game();
-            empty_input_area();
-            return;
-        }
-        c = getch();
-    }
+    color_puts("警告：存档的棋盘大小与配置不统一\n N - 新游戏", 4);
+    char c;
+    while ((c = getch()) != 'n' && c != 'N')
+        ;
+    new_game();
+    empty_input_area();
 }
 
 //设置文字颜色
