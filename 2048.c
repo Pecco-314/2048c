@@ -27,6 +27,7 @@ void save_game()
 {
     system("attrib -r save.dat"); //使存档文件可写
     FILE *save = fopen("save.dat", "w");
+    fprintf(save, "%d %d ", MAXX, MAXY); //存储当前棋盘的大小
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
             fprintf(save, "%d ", map[i][j]->value);
@@ -41,11 +42,15 @@ void load_game()
     FILE *save = fopen("save.dat", "r");
     if (save != NULL)
     {
+        int x, y;
+        fscanf(save, "%d%d", &x, &y);
         for (int i = 0; i < MAXX; ++i)
             for (int j = 0; j < MAXY; ++j)
                 fscanf(save, "%d", &map[i][j]->value);
         fscanf(save, "%llu%llu", &pts, &bests);
         fclose(save);
+        if (x != MAXX || y != MAXY)
+            trigger_warning(UNMATCH_SAVE_FORMAT);
         reprint_all();
         save_game();
     }
@@ -242,7 +247,7 @@ void lose()
         {
         case 'N':
         case 'n':
-            new_game();
+            new_game(); //FALLTROUGH
         case 'C':
         case 'c':
             empty_input_area();
@@ -286,7 +291,7 @@ void all_combinable()
 void empty_input_area()
 {
     prepare_to_input();
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 3; ++i)
         for (int j = 0; j < cols; ++j)
             putchar(' ');
     prepare_to_input();
@@ -295,8 +300,8 @@ void empty_input_area()
 // 新游戏，清空棋盘，随机生成两个方块，分数设置为0
 void new_game()
 {
-    for (int i = 0; i < 4; ++i)
-        for (int j = 0; j < 4; ++j)
+    for (int i = 0; i < MAXX; ++i)
+        for (int j = 0; j < MAXY; ++j)
             set_block_value(i, j, 0);
     generate();
     generate();
@@ -470,7 +475,8 @@ void hide_cursor()
 }
 
 //打印棋盘n行，列数为y，可定制各种格式
-void print_board_line(const char head[], const char body[], const char crossing[], const char tail[], int y, int n)
+void print_board_line(const char head[], const char body[], const char crossing[],
+                      const char tail[], int y, int n)
 {
     for (int k = 0; k < n; ++k)
     {
@@ -524,4 +530,50 @@ void print_board()
     print_board_tail(MAXY, 1);
     puts("分数：");
     puts("最高：");
+}
+
+void trigger_warning(enum warning w)
+{
+    switch (w)
+    {
+    case UNMATCH_SAVE_FORMAT:
+        warn_unmatch_save_format();
+    }
+}
+
+void warn_unmatch_save_format()
+{
+    prepare_to_input();
+    color_puts("错误：存档的棋盘大小与配置不统一\n N - 新游戏", 4);
+    char c = getch();
+    while (1)
+    {
+        switch (c)
+        {
+        case 'N':
+        case 'n':
+            new_game();
+            empty_input_area();
+            return;
+        }
+        c = getch();
+    }
+}
+
+//设置文字颜色
+// 0-黑 1-蓝 2-绿 3-浅绿 4-红 5-紫 6-黄 7-白 8-灰 9-淡蓝
+// 10-淡绿 11-淡浅绿 12-淡红 13-淡紫 14-淡黄 15-亮白
+void set_text_color(int ForeColor, int BackColor)
+{
+    HANDLE winHandle; //句柄
+    winHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleTextAttribute(winHandle, ForeColor + BackColor * 0x10);
+}
+
+//带颜色的puts
+void color_puts(char *string, int color)
+{
+    set_text_color(color, 15);
+    puts(string);
+    set_text_color(0, 15);
 }

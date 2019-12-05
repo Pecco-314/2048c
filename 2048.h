@@ -3,7 +3,7 @@
 #define max(a, b) ({int _a = a; int _b = b; _a > _b ? _a : _b; })
 #define swap(a, b) ({int *_a = &a; int *_b = &b; int _t = *_a; *_a = *_b; *_b = _t; })
 #define MAXX 4
-#define MAXY 4
+#define MAXY 3
 #define GOAL 2048
 #define BLOCK_SIZE 5
 #define AUTO_SAVE 1
@@ -13,6 +13,12 @@
 #include <conio.h>
 #include <windows.h>
 #include <time.h>
+
+///警告枚举
+enum warning
+{
+    UNMATCH_SAVE_FORMAT
+};
 
 // 方块，包含横坐标，纵坐标，值和可结合性
 typedef struct
@@ -71,6 +77,8 @@ void window_resize();
 void window_fix();
 void locate(COORD coord);
 void hide_cursor();
+void set_text_color(int ForeColor, int BackColor);
+void color_puts(char *string, int color);
 
 void print_board_line(const char head[], const char body[], const char crossing[], const char tail[], int y, int n);
 void print_board_head(int y, int n);
@@ -80,5 +88,7 @@ void print_board_tail(int y, int n);
 void print_board();
 void reprint_all();
 void update_pts();
+void trigger_warning(enum warning w);
+void warn_unmatch_save_format();
 
 #endif
