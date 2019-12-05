@@ -5,7 +5,7 @@ void Init()
 {
     initUI();
     init_map();
-    new_game();
+    load_game();
 }
 
 // 处理每一步的操作
@@ -13,11 +13,39 @@ void Step()
 {
     prepare_to_input();
     int ch = getch();
-    if (ch == 224)
+    if (ch == 224 || ch == 0)
         ch = getch() + 1000;
     move(ch);
     reprint_all();
+    if (AUTO_SAVE)
+        save_game();
     judge();
+}
+
+//保存游戏
+void save_game()
+{
+    FILE *save = fopen("save.dat", "wb");
+    for (int i = 0; i < MAXX; ++i)
+        for (int j = 0; j < MAXY; ++j)
+            fprintf(save, "%d ", map[i][j]->value);
+    fclose(save);
+}
+
+//读取游戏
+void load_game()
+{
+    FILE *save = fopen("save.dat", "rb");
+    if (save != NULL)
+    {
+        for (int i = 0; i < MAXX; ++i)
+            for (int j = 0; j < MAXY; ++j)
+                fscanf(save, "%d", &map[i][j]->value);
+        fclose(save);
+        reprint_all();
+    }
+    else
+        new_game();
 }
 
 //根据输入处理移动
@@ -32,6 +60,10 @@ void move(int ch)
         c = 'l';
     else if (ch == 'D' || ch == 'd' || ch == 1077)
         c = 'r';
+    else if (ch == 1063)
+        new_game();
+    else if (ch == 1059)
+        WinExec("notepad.exe help.txt", SW_SHOW);
     if (c && all_move(c))
         generate();
 }
@@ -194,6 +226,7 @@ int judge_lose()
 //游戏失败处理
 void lose()
 {
+    prepare_to_input();
     puts("已无可移动的方块，游戏失败。\n N - 新游戏  C - 继续游戏");
     char c = getch();
     while (1)
@@ -215,6 +248,7 @@ void lose()
 //游戏胜利处理
 void win()
 {
+    prepare_to_input();
     puts("游戏胜利，恭喜！\n N - 新游戏  C - 继续游戏");
     char c = getch();
     while (1)
@@ -285,7 +319,7 @@ COORD get_coord(const block *b)
 {
     COORD coord;
     coord.X = 1 + (BLOCK_SIZE * 2 + 1) * b->y;
-    coord.Y = 3 + (BLOCK_SIZE + 1) * b->x + (BLOCK_SIZE + 1) / 2;
+    coord.Y = 4 + (BLOCK_SIZE + 1) * b->x + BLOCK_SIZE / 2;
     return coord;
 }
 
@@ -382,7 +416,7 @@ void initUI()
     system("title 2048"); //设置标题
     system("color F0");   //设置背景色为白色，前景色为黑色
     puts("2048控制台版 - made by Pecco\n");
-    puts("W - 向上  A - 向左  S - 向下  D - 向右");
+    puts("若您在游玩时有任何问题，可以按F1打开帮助文件");
     print_board();
 }
 
@@ -391,7 +425,7 @@ void window_resize()
 {
     char s[30] = "";
     int lines = 8 + MAXX * (BLOCK_SIZE + 1);
-    int cols = max(40, 3 + MAXY * (BLOCK_SIZE * 2 + 1)); // cols不能小于40
+    int cols = max(46, 3 + MAXY * (BLOCK_SIZE * 2 + 1)); // cols不能小于46
     sprintf(s, "mode con cols=%d lines=%d", cols, lines);
     system(s);
 }

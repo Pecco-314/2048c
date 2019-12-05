@@ -4,8 +4,9 @@
 #define swap(a, b) ({int *_a = &a; int *_b = &b; int _t = *_a; *_a = *_b; *_b = _t; })
 #define MAXX 4
 #define MAXY 4
-#define BLOCK_SIZE 3
 #define GOAL 2048
+#define BLOCK_SIZE 5
+#define AUTO_SAVE 1
 #define ROF 10 //出现4的频率的倒数（Reciprocal of Frequency）
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,6 +32,8 @@ void prepare_to_input();
 void empty_input_area();
 void move(int ch);
 
+void save_game();
+void load_game();
 void new_game();
 void judge();
 int judge_lose();
