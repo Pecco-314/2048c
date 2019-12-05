@@ -25,24 +25,29 @@ void Step()
 //保存游戏
 void save_game()
 {
-    FILE *save = fopen("save.dat", "wb");
+    system("attrib -r save.dat"); //使存档文件可写
+    FILE *save = fopen("save.dat", "w");
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
             fprintf(save, "%d ", map[i][j]->value);
+    fprintf(save, "%llu %llu", pts, bests);
     fclose(save);
+    system("attrib +r save.dat"); //设置存档文件只读
 }
 
 //读取游戏
 void load_game()
 {
-    FILE *save = fopen("save.dat", "rb");
+    FILE *save = fopen("save.dat", "r");
     if (save != NULL)
     {
         for (int i = 0; i < MAXX; ++i)
             for (int j = 0; j < MAXY; ++j)
                 fscanf(save, "%d", &map[i][j]->value);
+        fscanf(save, "%llu%llu", &pts, &bests);
         fclose(save);
         reprint_all();
+        save_game();
     }
     else
         new_game();
@@ -102,6 +107,8 @@ int combine_to(block *b, char dir)
         end->value *= 2;
         b->value = 0;
         end->combinable = 0;
+        pts += end->value;
+        bests = max(bests, pts);
         return 1;
     }
     return 0;
@@ -188,7 +195,7 @@ int all_move(char dir)
 //把光标移到输入区
 void prepare_to_input()
 {
-    COORD coord = {0, (BLOCK_SIZE + 1) * MAXX + 4};
+    COORD coord = {0, (BLOCK_SIZE + 1) * MAXX + 6};
     locate(coord);
 }
 
@@ -280,12 +287,12 @@ void empty_input_area()
 {
     prepare_to_input();
     for (int i = 0; i < 4; ++i)
-        for (int j = 0; j < max(40, 3 + MAXY * (BLOCK_SIZE * 2 + 1)); ++j)
+        for (int j = 0; j < cols; ++j)
             putchar(' ');
     prepare_to_input();
 }
 
-// 新游戏，清空棋盘，随机生成两个方块
+// 新游戏，清空棋盘，随机生成两个方块，分数设置为0
 void new_game()
 {
     for (int i = 0; i < 4; ++i)
@@ -293,6 +300,8 @@ void new_game()
             set_block_value(i, j, 0);
     generate();
     generate();
+    save_game();
+    pts = 0;
     reprint_all();
 }
 
@@ -353,12 +362,24 @@ int has_space()
     return sec;
 }
 
-// 重新打印所有方块
+// 重新打印所有方块，并更新分数和最高分
 void reprint_all()
 {
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
             print_block(i, j);
+    update_pts();
+}
+
+// 更新分数和最高分
+void update_pts()
+{
+    COORD coord = {7, (BLOCK_SIZE + 1) * MAXX + 4};
+    locate(coord); //定位到打印分数的位置
+    printf("%-*llu", cols - 7, pts);
+    coord.Y += 1;
+    locate(coord);
+    printf("%-*llu", cols - 7, bests);
 }
 
 //随机生成2或4
@@ -424,8 +445,8 @@ void initUI()
 void window_resize()
 {
     char s[30] = "";
-    int lines = 8 + MAXX * (BLOCK_SIZE + 1);
-    int cols = max(46, 3 + MAXY * (BLOCK_SIZE * 2 + 1)); // cols不能小于46
+    lines = 9 + MAXX * (BLOCK_SIZE + 1);
+    cols = max(46, 3 + MAXY * (BLOCK_SIZE * 2 + 1)); // cols不能小于46
     sprintf(s, "mode con cols=%d lines=%d", cols, lines);
     system(s);
 }
@@ -501,4 +522,6 @@ void print_board()
     }
     print_board_body(MAXY, BLOCK_SIZE);
     print_board_tail(MAXY, 1);
+    puts("分数：");
+    puts("最高：");
 }

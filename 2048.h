@@ -23,6 +23,12 @@ typedef struct
 //游戏地图，存储方块指针
 block *map[MAXX][MAXY];
 
+//游戏的最高分和最低分
+unsigned long long pts, bests;
+
+//控制台的行数和列数
+int lines, cols;
+
 void Init();
 void Step();
 
@@ -41,8 +47,6 @@ int judge_win();
 void lose();
 void win();
 
-int has_space();
-void reprint_all();
 void init_map();
 void generate();
 void all_combinable();
@@ -51,6 +55,7 @@ int forall_u(int procedure(block *, char));
 int forall_l(int procedure(block *, char));
 int forall_r(int procedure(block *, char));
 int all_move(char dir);
+int has_space();
 
 void set_block_value(int i, int j, int value);
 void print_block(int i, int j);
@@ -73,4 +78,7 @@ void print_board_body(int y, int n);
 void print_board_crossing(int y, int n);
 void print_board_tail(int y, int n);
 void print_board();
+void reprint_all();
+void update_pts();
+
 #endif
