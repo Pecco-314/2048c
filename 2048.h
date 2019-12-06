@@ -11,12 +11,11 @@
 #include <time.h>
 #include <stdarg.h>
 
-// 方块，包含横坐标，纵坐标，可结合性以及文本
+// 方块，包含横坐标，纵坐标，ID，可结合性以及文本
 typedef struct
 {
-    int x, y, combinable;
-    int value; ///
-    //char *text;
+    int x, y, combinable, id;
+    char text[100];
 } block;
 
 //游戏地图，存储方块指针，动态分配内存
@@ -25,7 +24,7 @@ block ***Map;
 //方块记录，存储注册的方块
 typedef struct
 {
-    unsigned char id, is_genetatable;
+    int id, is_genetatable, points;
     char text[100];
     double freq;
 } block_record;
@@ -47,8 +46,9 @@ unsigned long long Pts, Bests;
 int Lines, Cols;
 
 //从.config中读取的参数
-int MAXX, MAXY, GOAL, BLOCK_SIZE;
+int MAXX, MAXY, BLOCK_SIZE;
 char AUTO_SAVE;
+char GOAL[100];
 
 void Init();
 void Step();
@@ -62,8 +62,10 @@ int count_digits(int n);
 void init_config();
 void open_config();
 void init_block_config(FILE *config);
-void register_block(int id, char *text, char is_genetatable, double freq);
+void init_empty_block();
+void register_block(int id, char *text, int points, char is_genetatable, double freq);
 void init_combination_config();
+void init_frequencies_list();
 
 void prepare_to_input();
 void empty_input_area();
@@ -90,13 +92,14 @@ int forall_r(int procedure(block *, char));
 int all_move(char dir);
 int has_space();
 
-void set_block_value(int i, int j, int value);
+void set_block(int i, int j, int id);
 void print_block(int i, int j);
 block *new_block(int x, int y);
 block *get_neighbor(const block *b, char dir);
 block *get_end(block *bk, char dir);
 int combine_to(block *b, char dir);
 int move_to(block *b, char dir);
+int get_random_id();
 COORD get_coord(const block *b);
 
 void initUI();

@@ -32,7 +32,7 @@ void save_game()
     fprintf(save, "%d %d ", MAXX, MAXY); //存储当前棋盘的大小
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
-            fprintf(save, "%d ", Map[i][j]->value);
+            fprintf(save, "%d ", Map[i][j]->id);
     fprintf(save, "%llu %llu", Pts, Bests);
     fclose(save);
     system("attrib +r save.dat"); //设置存档文件只读
@@ -44,12 +44,18 @@ void load_game()
     FILE *save = fopen("save.dat", "r");
     if (save != NULL)
     {
-        int x, y;
+        int x, y, id;
         fscanf(save, "%d%d", &x, &y); //读取棋盘大小
-        for (int i = 0; i < MAXX; ++i)
-            for (int j = 0; j < MAXY; ++j)
-                fscanf(save, "%d", &Map[i][j]->value);
-        fscanf(save, "%llu%llu", &Pts, &Bests); //读取分数
+        if (x == MAXX || y == MAXY)
+        {
+            for (int i = 0; i < MAXX; ++i)
+                for (int j = 0; j < MAXY; ++j)
+                {
+                    fscanf(save, "%d", &id);
+                    set_block(i, j, id);
+                }
+            fscanf(save, "%llu%llu", &Pts, &Bests); //读取分数
+        }
         fclose(save);
         if (x != MAXX || y != MAXY) //如果棋盘大小不匹配，触发一个警告
             warn_unmatch_save_format(x, y);
@@ -67,7 +73,7 @@ void save_history()
     FILE *hist = fopen("hist.dat", "a");
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
-            fprintf(hist, "%d ", Map[i][j]->value);
+            fprintf(hist, "%d ", Map[i][j]->id);
     fprintf(hist, "%llu %llu\n", Pts, Bests);
     fclose(hist);
     system("attrib +r +h hist.dat"); //设置历史文件为只读且隐藏
@@ -87,13 +93,16 @@ void init_hist()
 void update_from_last_line()
 {
     char buffer[1000];
-    int cntlines = count_lines("hist.dat");
+    int id, cntlines = count_lines("hist.dat");
     FILE *hist = fopen("hist.dat", "r");
     for (int i = 0; i < cntlines - 1; ++i)
         fgets(buffer, sizeof(buffer), hist);
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
-            fscanf(hist, "%d", &Map[i][j]->value);
+        {
+            if (fscanf(hist, "%d", &id) != EOF)
+                set_block(i, j, id);
+        }
     fscanf(hist, "%llu%llu", &Pts, &Bests);
     reprint_all();
     fclose(hist);
@@ -232,7 +241,7 @@ block *get_neighbor(const block *b, char dir)
 block *get_end(block *bk, char dir)
 {
     block *b = bk;
-    while (get_neighbor(b, dir) != NULL && get_neighbor(b, dir)->value == 0)
+    while (get_neighbor(b, dir) != NULL && get_neighbor(b, dir)->id == 0)
         b = get_neighbor(b, dir);
     return b;
 }
@@ -241,12 +250,12 @@ block *get_end(block *bk, char dir)
 int combine_to(block *b, char dir)
 {
     block *end = get_neighbor(b, dir);
-    if (end != NULL && b->value == end->value && end->combinable)
+    if (end != NULL && Comb[b->id][end->id] && end->combinable)
     {
-        end->value *= 2;
-        b->value = 0;
+        set_block(end->x, end->y, Comb[b->id][end->id]);
+        set_block(b->x, b->y, 0);
         end->combinable = 0;
-        Pts += end->value;
+        Pts += Regs[end->id]->points;
         Bests = max(Bests, Pts);
         return 1;
     }
@@ -258,10 +267,10 @@ int move_to(block *b, char dir)
 {
     int sec = 0;
     block *end = get_end(b, dir);
-    if (end != b && b->value)
+    if (end != b && b->id)
     {
-        end->value = b->value;
-        b->value = 0;
+        set_block(end->x, end->y, b->id);
+        set_block(b->x, b->y, 0);
         sec = 1;
     }
     if (combine_to(end, dir))
@@ -331,6 +340,13 @@ int all_move(char dir)
     return sec;
 }
 
+//用频率表随机生成一个方块ID
+int get_random_id()
+{
+    srand(time(NULL) * clock());
+    return Freq[rand() % 100];
+}
+
 //把光标移到输入区
 void prepare_to_input()
 {
@@ -352,7 +368,7 @@ int judge_win()
 {
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
-            if (Map[i][j]->value == GOAL)
+            if (strcmp(Map[i][j]->text, GOAL) == 0)
                 return 1;
     return 0;
 }
@@ -364,7 +380,7 @@ int judge_lose()
         return 0;
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
-            if ((i < MAXX - 1 && Map[i + 1][j]->value == Map[i][j]->value) || (j < MAXY - 1 && Map[i][j + 1]->value == Map[i][j]->value))
+            if ((i < MAXX - 1 && Comb[Map[i + 1][j]->id][Map[i][j]->id]) || (j < MAXY - 1 && Comb[Map[i][j + 1]->id][Map[i][j]->id]))
                 return 0;
     return 1;
 }
@@ -430,7 +446,7 @@ void new_game()
 {
     for (int i = 0; i < MAXX; ++i)
         for (int j = 0; j < MAXY; ++j)
-            set_block_value(i, j, 0);
+            set_block(i, j, 0);
     generate();
     generate();
     save_game();
@@ -471,7 +487,7 @@ block *new_block(int x, int y)
     block *b = (block *)malloc(sizeof(block));
     b->x = x;
     b->y = y;
-    b->value = 0;
+    b->id = 0;
     return b;
 }
 
@@ -483,7 +499,7 @@ int has_space()
     {
         for (int j = 0; j < MAXY; ++j)
         {
-            if (Map[i][j]->value == 0)
+            if (Map[i][j]->id == 0)
             {
                 sec = 1;
                 break;
@@ -518,14 +534,13 @@ void update_pts()
 //随机生成2或4
 void generate()
 {
-    srand(time(NULL) * clock());
-    int v = rand() % ROF ? 2 : 4;
+    int v = get_random_id();
     while (1)
     {
         int x = rand() % MAXX, y = rand() % MAXY;
-        if (Map[x][y]->value == 0)
+        if (Map[x][y]->id == 0)
         {
-            set_block_value(x, y, v);
+            set_block(x, y, v);
             break;
         }
     }
@@ -535,21 +550,23 @@ void generate()
 void init_config()
 {
     FILE *config = fopen(".config", "r");
-    fscanf(config, "%*s%*s%*s%d%*s%d%*s%d%*s%d%*s %c", &MAXX, &MAXY, &BLOCK_SIZE, &GOAL, &AUTO_SAVE);
+    fscanf(config, "%*s%*s%*s%d%*s%d%*s%d%*s%s%*s %c", &MAXX, &MAXY, &BLOCK_SIZE, &GOAL, &AUTO_SAVE);
     //手动跳过注释，这样写不太好，但我不想写复杂的字符串处理
     fscanf(config, "%*s%*s%*s%*s%*s");
     init_block_config(config);
     fscanf(config, "%*s%*s%*s%*s");
     init_combination_config(config);
     fclose(config);
+    init_frequencies_list();
 }
 
 //初始化方块配置
 void init_block_config(FILE *config)
 {
     char opr, text[100];
-    int id;
+    int id, points;
     double freq;
+    init_empty_block();
     while (1)
     {
         fscanf(config, " %c", &opr);
@@ -557,15 +574,24 @@ void init_block_config(FILE *config)
             break;
         else if (opr == 'N')
         {
-            fscanf(config, " %d%s", &id, text);
-            register_block(id, text, 0, 0);
+            fscanf(config, " %d%s%d", &id, text, &points);
+            register_block(id, text, points, 0, 0);
         }
         else if (opr == 'G')
         {
-            fscanf(config, "%d%s%lf", &id, text, &freq);
-            register_block(id, text, 1, freq);
+            fscanf(config, "%d%s%d%lf", &id, text, &points, &freq);
+            register_block(id, text, points, 1, freq);
         }
     }
+}
+
+//初始化空方块
+void init_empty_block()
+{
+    Regs[0] = (block_record *)malloc(sizeof(block_record));
+    Regs[0]->is_genetatable = 0;
+    Regs[0]->id = 0;
+    Regs[0]->points = 0;
 }
 
 //初始化组合配置
@@ -577,10 +603,11 @@ void init_combination_config(FILE *config)
 }
 
 //注册方块
-void register_block(int id, char *text, char is_genetatable, double freq)
+void register_block(int id, char *text, int points, char is_genetatable, double freq)
 {
     Regs[id] = (block_record *)malloc(sizeof(block_record));
     Regs[id]->id = id;
+    Regs[id]->points = points;
     Regs[id]->is_genetatable = is_genetatable;
     strcpy(Regs[id]->text, text);
     if (is_genetatable)
@@ -593,8 +620,11 @@ void init_frequencies_list()
     int pos = 0;
     for (int id = 1; id < 100; ++id)
         if (Regs[id] != NULL && Regs[id]->is_genetatable)
-            for (int i = pos; i < (int)(Regs[id]->freq * 100); ++i)
-                Freq[i] = id;
+        {
+            int tpos = (int)(Regs[id]->freq * 100) + pos;
+            for (pos; pos < tpos; ++pos)
+                Freq[pos] = id;
+        }
 }
 
 //初始化游戏地图数组
@@ -609,9 +639,10 @@ void init_map()
 }
 
 // 设置某坐标的方块的值
-void set_block_value(int i, int j, int value)
+void set_block(int i, int j, int id)
 {
-    Map[i][j]->value = value;
+    Map[i][j]->id = id;
+    strcpy(Map[i][j]->text, Regs[id]->text);
 }
 
 // 打印某坐标的方块，如果方块的值是0则清空该格
@@ -622,11 +653,11 @@ void print_block(int i, int j)
     locate(coord);
     for (int i = 0; i < BLOCK_SIZE * 2; ++i)
         putchar(' ');
-    if (Map[i][j]->value)
+    if (Map[i][j]->id)
     {
-        coord.X += (BLOCK_SIZE * 2 - count_digits(b->value) + 1) / 2; //居中对齐
+        coord.X += (BLOCK_SIZE * 2 - strlen(b->text) + 1) / 2; //居中对齐
         locate(coord);
-        printf("%d", b->value);
+        printf("%s", b->text);
     }
 }
 
