@@ -51,8 +51,8 @@ void load_game()
                 fscanf(save, "%d", &Map[i][j]->value);
         fscanf(save, "%llu%llu", &Pts, &Bests); //读取分数
         fclose(save);
-        while (x != MAXX || y != MAXY) //如果棋盘大小不匹配，触发一个警告
-            trigger_warning(UNMATCH_SAVE_FORMAT, x, y);
+        if (x != MAXX || y != MAXY) //如果棋盘大小不匹配，触发一个警告
+            warn_unmatch_save_format(x, y);
         reprint_all();
         save_game();
     }
@@ -155,6 +155,10 @@ void process_input(int ch)
         new_game();
     else if (ch == 1059) //F1：帮助
         WinExec("notepad.exe help.txt", SW_SHOW);
+    else if (ch == 1066) //F8：手动保存
+        save_game();
+    else if (ch == 1068) //F10:手动读档
+        load_game();
     else if (ch == 'C' || ch == 'c') // C：配置
         open_config();
     else if (ch == 'Q' || ch == 'q') // Q：退出
@@ -174,20 +178,38 @@ void process_input(int ch)
 //打开配置文件
 void open_config()
 {
-    char ch;
     WinExec("notepad.exe .config", SW_SHOW);
     empty_input_area();
     prepare_to_input();
     color_puts("配置文件可能已改变，是否重新初始化游戏？\n Y - 是  N - 不", 1);
-    while (ch = getch())
-    {
-        if (ch == 'Y' || ch == 'y')
-            Init();
-        if (ch == 'Y' || ch == 'y' || ch == 'N' || ch == 'n')
-            break;
-    }
+    input_for_choice("YN", Init, do_nothing);
     empty_input_area();
     prepare_to_input();
+}
+
+//根据用户输出做出选择
+//input是大写的选择字符串，后面跟相应的void函数指针
+//例如，可以这样调用：input_for_choice("YN", new_game, do_nothing)
+void input_for_choice(const char *input, ...)
+{
+    int len = strlen(input);
+    char ch;
+    fp choices[len]; //函数指针数组
+    va_list args;
+    va_start(args, input);
+    for (int i = 0; i < len; ++i)
+        choices[i] = va_arg(args, fp);
+    va_end(args);
+    while (ch = getch())
+    {
+        for (int i = 0; i < len; ++i)
+            if (ch == input[i] || ch == input[i] + 'a' - 'A')
+            {
+                choices[i]();
+                empty_input_area();
+                return;
+            }
+    }
 }
 
 //获取方块在某个方向上紧挨着的方块，若达边界返回NULL
@@ -352,7 +374,7 @@ void lose()
 {
     prepare_to_input();
     color_puts("已无可移动的方块，游戏失败。\n N - 新游戏  C - 继续游戏\a", 12);
-    new_or_continue();
+    input_for_choice("NC", new_game, do_nothing);
 }
 
 //游戏胜利处理
@@ -360,24 +382,29 @@ void win()
 {
     prepare_to_input();
     color_puts("游戏胜利，恭喜！\n N - 新游戏  C - 继续游戏", 3);
-    new_or_continue();
+    play_twinkle_star();
+    input_for_choice("NC", new_game, do_nothing);
     char c;
 }
 
-//用户选择新游戏或继续游戏
-void new_or_continue()
+//播放小星星
+void play_twinkle_star()
 {
-    char c;
-    while (c = getch())
-    {
-        if (c == 'N' || c == 'n')
-            new_game();
-        if (c == 'c' || c == 'C' || c == 'N' || c == 'n')
-        {
-            empty_input_area();
-            break;
-        }
-    }
+    //1155665- 4433221-
+    Beep(261, 200);
+    Beep(261, 200);
+    Beep(392, 200);
+    Beep(392, 200);
+    Beep(440, 200);
+    Beep(440, 200);
+    Beep(392, 400);
+    Beep(349, 200);
+    Beep(349, 200);
+    Beep(330, 200);
+    Beep(330, 200);
+    Beep(294, 200);
+    Beep(294, 200);
+    Beep(261, 400);
 }
 
 //使所有方块可结合
@@ -510,7 +537,64 @@ void init_config()
     FILE *config = fopen(".config", "r");
     fscanf(config, "%*s%*s%*s%d%*s%d%*s%d%*s%d%*s %c", &MAXX, &MAXY, &BLOCK_SIZE, &GOAL, &AUTO_SAVE);
     //手动跳过注释，这样写不太好，但我不想写复杂的字符串处理
+    fscanf(config, "%*s%*s%*s%*s%*s");
+    init_block_config(config);
+    fscanf(config, "%*s%*s%*s%*s");
+    init_combination_config(config);
     fclose(config);
+}
+
+//初始化方块配置
+void init_block_config(FILE *config)
+{
+    char opr, text[100];
+    int id;
+    double freq;
+    while (1)
+    {
+        fscanf(config, " %c", &opr);
+        if (opr == 'E')
+            break;
+        else if (opr == 'N')
+        {
+            fscanf(config, " %d%s", &id, text);
+            register_block(id, text, 0, 0);
+        }
+        else if (opr == 'G')
+        {
+            fscanf(config, "%d%s%lf", &id, text, &freq);
+            register_block(id, text, 1, freq);
+        }
+    }
+}
+
+//初始化组合配置
+void init_combination_config(FILE *config)
+{
+    int i, j, k;
+    while (fscanf(config, "%d%d%d", &i, &j, &k) != EOF)
+        Comb[i][j] = k;
+}
+
+//注册方块
+void register_block(int id, char *text, char is_genetatable, double freq)
+{
+    Regs[id] = (block_record *)malloc(sizeof(block_record));
+    Regs[id]->id = id;
+    Regs[id]->is_genetatable = is_genetatable;
+    strcpy(Regs[id]->text, text);
+    if (is_genetatable)
+        Regs[id]->freq = freq;
+}
+
+//初始化频率表
+void init_frequencies_list()
+{
+    int pos = 0;
+    for (int id = 1; id < 100; ++id)
+        if (Regs[id] != NULL && Regs[id]->is_genetatable)
+            for (int i = pos; i < (int)(Regs[id]->freq * 100); ++i)
+                Freq[i] = id;
 }
 
 //初始化游戏地图数组
@@ -563,7 +647,7 @@ void initUI()
 void window_resize()
 {
     char s[30] = "";
-    Lines = 9 + MAXX * (BLOCK_SIZE + 1);
+    Lines = 10 + MAXX * (BLOCK_SIZE + 1);
     Cols = max(46, 3 + MAXY * (BLOCK_SIZE * 2 + 1)); // Cols不能小于46
     sprintf(s, "mode con cols=%d lines=%d", Cols, Lines);
     system(s);
@@ -645,16 +729,6 @@ void print_board()
     puts("最高：");
 }
 
-//触发警告，v1和v2是可选项，若不需要则为0
-void trigger_warning(enum warning w, int v1, int v2)
-{
-    switch (w)
-    {
-    case UNMATCH_SAVE_FORMAT:
-        warn_unmatch_save_format(v1, v2);
-    }
-}
-
 //存档格式不匹配警告
 void warn_unmatch_save_format(int x, int y)
 {
@@ -662,22 +736,34 @@ void warn_unmatch_save_format(int x, int y)
     set_text_color(4);
     printf("警告：存档的棋盘大小与配置不统一\n"
            "存档为：%d行%d列  配置为：%d行%d列\n"
-           "N - 新游戏  C - 修改配置  Q - 退出",
+           " N - 新游戏  C - 修改配置  Q - 退出",
            x, y, MAXX, MAXY);
     set_text_color(0);
-    char c;
-    while ((c = getch()) != 'n' && c != 'N')
-    {
-        if (c == 'c' || c == 'C')
-        {
-            open_config();
-            return;
-        }
-        if (c == 'q' || c == 'Q')
-            exit(0);
-    }
-    new_game();
+    input_for_choice("NCQ", warn_dangerous_new_game, open_config_then_load_game, quit_game);
+}
+
+//对在存档不匹配时进行新游戏进行警告
+void warn_dangerous_new_game()
+{
     empty_input_area();
+    prepare_to_input();
+    color_puts("警告：如果您开始新游戏，您会丢失自己的最高记录\n您可以修改配置文件，或退出并备份自己的存档\n"
+               " N - 新游戏  C - 修改配置  Q - 退出",
+               4);
+    input_for_choice("NCQ", new_game, open_config_then_load_game, quit_game);
+}
+
+////以下几个函数是因为C没有lambda表达式而写的很蠢的函数
+
+//什么都不做
+void do_nothing() {}
+//退出游戏
+void quit_game() { exit(0); }
+//打开配置文件并读档
+void open_config_then_load_game()
+{
+    open_config();
+    load_game();
 }
 
 //设置文字颜色

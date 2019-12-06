@@ -5,24 +5,40 @@
 #define ROF 10 //出现4的频率的倒数（Reciprocal of Frequency）
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <conio.h>
 #include <windows.h>
 #include <time.h>
+#include <stdarg.h>
 
-///警告枚举
-enum warning
-{
-    UNMATCH_SAVE_FORMAT
-};
-
-// 方块，包含横坐标，纵坐标，值和可结合性
+// 方块，包含横坐标，纵坐标，可结合性以及文本
 typedef struct
 {
-    int x, y, value, combinable;
+    int x, y, combinable;
+    int value; ///
+    //char *text;
 } block;
 
 //游戏地图，存储方块指针，动态分配内存
 block ***Map;
+
+//方块记录，存储注册的方块
+typedef struct
+{
+    unsigned char id, is_genetatable;
+    char text[100];
+    double freq;
+} block_record;
+block_record *Regs[100];
+
+//重命名void函数指针
+typedef void (*fp)();
+
+//频率表
+int Freq[100];
+
+//组合表
+int Comb[100][100];
 
 //游戏的最高分和最低分
 unsigned long long Pts, Bests;
@@ -37,14 +53,22 @@ char AUTO_SAVE;
 void Init();
 void Step();
 
+void do_nothing();
+void quit_game();
+void open_config_then_load_game();
+
 int count_digits(int n);
 
 void init_config();
 void open_config();
+void init_block_config(FILE *config);
+void register_block(int id, char *text, char is_genetatable, double freq);
+void init_combination_config();
 
 void prepare_to_input();
 void empty_input_area();
 void process_input(int ch);
+void input_for_choice(const char *input, ...);
 
 void save_game();
 void load_game();
@@ -54,7 +78,7 @@ int judge_lose();
 int judge_win();
 void lose();
 void win();
-void new_or_continue();
+void play_twinkle_star();
 
 void init_map();
 void generate();
@@ -99,7 +123,7 @@ void print_board();
 void reprint_all();
 void update_pts();
 
-void trigger_warning(enum warning w, int v1, int v2);
+void warn_dangerous_new_game();
 void warn_unmatch_save_format(int x, int y);
 
 #endif
