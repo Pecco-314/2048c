@@ -56,9 +56,6 @@ void Step();
 void do_nothing();
 void quit_game();
 void open_config_then_load_game();
-
-int count_digits(int n);
-
 void init_config();
 void open_config();
 void init_block_config(FILE *config);

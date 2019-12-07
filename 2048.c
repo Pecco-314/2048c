@@ -454,18 +454,6 @@ void new_game()
     reprint_all();
 }
 
-// 返回一个十进制整数的位数
-int count_digits(int n)
-{
-    int digits = 0;
-    while (n)
-    {
-        digits++;
-        n /= 10;
-    }
-    return digits;
-}
-
 // 设置光标位置
 void locate(COORD coord)
 {
