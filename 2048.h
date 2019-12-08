@@ -66,7 +66,7 @@ void init_frequencies_list();
 
 void prepare_to_input();
 void empty_input_area();
-void process_input(int ch);
+int process_input(int ch);
 void input_for_choice(const char *input, ...);
 
 void save_game();

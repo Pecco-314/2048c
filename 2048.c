@@ -17,11 +17,12 @@ void Step()
     int ch = getch();
     if (ch == 224 || ch == 0)
         ch = getch() + 1000;
-    process_input(ch);
+    int moving = process_input(ch);
     reprint_all();
     if (AUTO_SAVE == 'Y')
         save_game();
-    judge();
+    if (moving)
+        judge();
 }
 
 //保存游戏
@@ -149,7 +150,7 @@ void delete_last_line(char *filename)
 }
 
 //根据输入处理移动
-void process_input(int ch)
+int process_input(int ch)
 {
     char c = 0;
     if (ch == 'S' || ch == 's' || ch == 1080)
@@ -177,11 +178,12 @@ void process_input(int ch)
     else if (ch == 'Z' || ch == 'z') // Z：撤回
     {
         withdraw_step();
-        return; //不保存历史
+        return 0; //不保存历史
     }
     if (c && all_move(c))
         generate();
     save_history();
+    return c;
 }
 
 //打开配置文件
@@ -209,8 +211,9 @@ void input_for_choice(const char *input, ...)
     for (int i = 0; i < len; ++i)
         choices[i] = va_arg(args, fp);
     va_end(args);
-    while (ch = getch())
+    while (1)
     {
+        ch = getch();
         for (int i = 0; i < len; ++i)
             if (ch == input[i] || ch == input[i] + 'a' - 'A')
             {
