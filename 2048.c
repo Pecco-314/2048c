@@ -1,5 +1,6 @@
 #include "2048.h"
 
+int Frequencies_List_Uncorrected = 0;
 // 初始化
 void Init()
 {
@@ -614,8 +615,17 @@ void init_frequencies_list()
         {
             int tpos = (int)(Regs[id]->freq * 100) + pos;
             for (pos; pos < tpos; ++pos)
+            {
+                if (pos >= 100)
+                {
+                    Frequencies_List_Uncorrected = 1;
+                    return;
+                }
                 Freq[pos] = id;
+            }
         }
+    if (pos != 100)
+        Frequencies_List_Uncorrected = 1;
 }
 
 //初始化游戏地图数组
@@ -663,6 +673,8 @@ void initUI()
     puts("2048控制台版 - made by Pecco\n");
     puts("若您在游玩时有任何问题，可以按F1打开帮助文件");
     print_board();
+    if (Frequencies_List_Uncorrected)
+        warn_frequencies_list();
 }
 
 // 根据格子的多少和大小设置窗口大小
@@ -764,6 +776,16 @@ void warn_unmatch_save_format(int x, int y)
     input_for_choice("NCQ", warn_dangerous_new_game, open_config_then_load_game, quit_game);
 }
 
+//频率表错误警告
+void warn_frequencies_list()
+{
+    prepare_to_input();
+    color_puts("警告：所有方块的出现频率之和应为1，请重新配置\n"
+               " C - 修改配置  Q - 退出",
+               4);
+    input_for_choice("CQ", check_and_open_config, quit_game);
+}
+
 //对在存档不匹配时进行新游戏进行警告
 void warn_dangerous_new_game()
 {
@@ -786,6 +808,12 @@ void open_config_then_load_game()
 {
     open_config();
     load_game();
+}
+//打开配置文件，重新检查频率表的正确性
+void check_and_open_config()
+{
+    Frequencies_List_Uncorrected = 0;
+    open_config();
 }
 
 //设置文字颜色

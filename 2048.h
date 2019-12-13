@@ -56,6 +56,7 @@ void Step();
 void do_nothing();
 void quit_game();
 void open_config_then_load_game();
+void check_and_open_config();
 void init_config();
 void open_config();
 void init_block_config(FILE *config);
@@ -125,5 +126,6 @@ void update_pts();
 
 void warn_dangerous_new_game();
 void warn_unmatch_save_format(int x, int y);
+void warn_frequencies_list();
 
 #endif
