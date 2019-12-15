@@ -2,7 +2,6 @@
 #define _2048_H_
 #define max(a, b) ({int _a = a; int _b = b; _a > _b ? _a : _b; })
 #define swap(a, b) ({int *_a = &a; int *_b = &b; int _t = *_a; *_a = *_b; *_b = _t; }
-#define ROF 10 //出现4的频率的倒数（Reciprocal of Frequency）
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
